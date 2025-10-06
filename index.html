@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ingredient Cost Calculator</title>
+<style>
+  /* THEME TOKENS */
+  :root{
+    --radius:18px;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --accent:#38bdf8;
+    --accent2:#a78bfa;
+    --warn:#f59e0b;
+    --danger:#ef4444;
+    --gold: rgba(245, 158, 11, .70);
+  }
+  /* DARK THEME */
+  [data-theme="dark"]{
+    --bg1:#0f172a; /* slate-900 */
+    --bg2:#1e293b; /* slate-800 */
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --card: rgba(15,23,42,.8);
+    --card2: rgba(2,6,23,.8);
+    --ring:#f59e0b;
+    --border: var(--gold);
+    --menu-bg:#0b1220;   /* dropdown list bg */
+    --menu-fg:#e5e7eb;   /* dropdown list text */
+  }
+  /* LIGHT THEME */
+  [data-theme="light"]{
+    --bg1:#f8fafc; /* slate-50 */
+    --bg2:#eef2ff; /* indigo-50 */
+    --text:#0f172a;
+    --muted:#475569;
+    --card:#ffffff;
+    --card2:#ffffff;
+    --ring:#d97706;
+    --border: rgba(234,179,8,.85);
+    --menu-bg:#ffffff;
+    --menu-fg:#0f172a;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body{
+    margin:0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+    color:var(--text);
+    background:
+      radial-gradient(1200px 800px at 10% -10%, rgba(56,189,248,.15), transparent 60%),
+      radial-gradient(1200px 800px at 110% 20%, rgba(167,139,250,.18), transparent 60%),
+      linear-gradient(135deg, var(--bg1), var(--bg2));
+    transition: background-color .2s ease, color .2s ease;
+  }
+
+  .container{ max-width:1100px; margin:40px auto; padding:0 20px 80px; }
+  .topbar{ display:flex; align-items:center; gap:16px; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; }
+  .totals{
+    padding:18px 22px; border-radius: var(--radius);
+    background: linear-gradient(135deg, rgba(99,102,241,.15), rgba(56,189,248,.12));
+    border:1px solid var(--border);
+    box-shadow: var(--shadow);
+    display:flex; align-items:center; gap:16px;
+  }
+  .totals .label{ color: var(--muted); font-weight:600; letter-spacing:.02em;}
+  .totals .value{ font-size: clamp(24px, 3.5vw, 36px); font-weight: 800; }
+  .controls{ display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+
+  .btn{
+    appearance:none; border:none; outline:none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color:#0b1020; font-weight: 700; padding:12px 16px; border-radius:14px;
+    cursor:pointer; transition: transform .08s ease, filter .2s ease;
+    box-shadow: 0 8px 20px rgba(56,189,248,.25); white-space:nowrap;
+  }
+  .btn:hover{ filter: brightness(1.05); }
+  .btn:active{ transform: translateY(1px) scale(.99); }
+
+  .ghost-btn{
+    background: transparent; color:var(--text); padding:10px 12px;
+    border-radius:12px; border:1px solid var(--border); box-shadow: var(--shadow);
+  }
+
+  .pill{
+    font-size:12px; padding:4px 8px; border-radius:999px;
+    border:1px solid var(--border);
+    background: color-mix(in oklab, var(--card2) 85%, transparent);
+    color:var(--text);
+    display:flex; align-items:center; gap:8px;
+  }
+  .select{ display:flex; align-items:center; gap:8px; }
+  select{
+    appearance:none; outline:none; border:none; background: transparent;
+    color:var(--text); font-size:14px; padding:8px 6px; border-radius:10px;
+  }
+  /* Dropdown list (options) readable in both themes */
+  select option{
+    background: var(--menu-bg);
+    color: var(--menu-fg);
+  }
+
+  .cards{ display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-top:20px; }
+  .card{
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--border); border-radius: var(--radius); padding:16px;
+    box-shadow: var(--shadow); position:relative; overflow:hidden;
+  }
+  .card::before{
+    content:""; position:absolute; inset: -1px -1px auto auto; width: 160px; height: 160px;
+    background: radial-gradient(120px 120px at 100% 0, rgba(245,158,11,.25), transparent 60%);
+    pointer-events:none;
+  }
+  .card h3{ margin:0 0 8px 0; font-size:18px; font-weight:750; letter-spacing:.2px; }
+  .line{ display:flex; gap:10px; align-items:center; margin:8px 0; color:var(--muted); font-size:14px; flex-wrap: wrap; }
+  .money{ color:var(--text); font-weight:800; }
+  .muted{ color:var(--muted); }
+  .card-actions{ display:flex; gap:8px; margin-top:12px; }
+  .danger{ background: linear-gradient(135deg, #fb7185, #f43f5e); color:#0b1020; }
+  .warn{ background: linear-gradient(135deg, #fbbf24, #f59e0b); color:#0b1020; }
+
+  /* Modal */
+  .modal-backdrop{ position:fixed; inset:0; background: rgba(2,6,23,.6); backdrop-filter: blur(6px);
+    display:none; align-items:center; justify-content:center; padding:20px; z-index: 50; }
+  [data-theme="light"] .modal-backdrop{ background: rgba(0,0,0,.25); }
+  .modal{ width:min(720px, 96vw); background: linear-gradient(180deg, var(--card), var(--card2));
+    border:1px solid var(--border); border-radius:22px; padding:20px; box-shadow: var(--shadow); }
+  .modal header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .modal h2{ margin:0; font-size:22px; }
+  .grid{ display:grid; gap:12px; grid-template-columns: repeat(12, 1fr); }
+  .grid > .col-12{ grid-column: span 12; }
+  .grid > .col-6{ grid-column: span 6; }
+  .grid > .col-3{ grid-column: span 3; }
+  .field{ display:flex; flex-direction:column; gap:6px;
+    background: color-mix(in oklab, var(--card2) 85%, transparent);
+    border:1px solid var(--border); padding:12px; border-radius:14px; }
+  label{ font-size:12px; color:var(--muted); }
+  input, textarea{
+    appearance:none; outline:none; border:none; background: transparent; color:var(--text);
+    font-size:14px; padding:8px 6px; border-radius:10px;
+  }
+  .help{ font-size:12px; color:var(--muted); }
+  .subtle{ font-size:12px; color:var(--muted); }
+  .divider{ height:1px; background: var(--border); margin:8px 0 12px; }
+  .footer{ display:flex; justify-content:flex-end; gap:10px; margin-top:10px; }
+
+  @media (max-width: 640px){
+    .topbar{ flex-direction:column; align-items:stretch; gap:10px; }
+    .controls{ justify-content:space-between; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="totals">
+        <div>
+          <div class="label">Total Recipe Cost</div>
+          <div class="value" id="totalCost">₱0.00</div>
+        </div>
+        <span class="pill" id="ingredientCount">0 ingredients</span>
+      </div>
+      <div class="controls">
+        <button class="btn" id="addIngredientBtn">+ Add Ingredient</button>
+        <button class="ghost-btn" id="resetAllBtn" title="Clear all">Reset</button>
+        <div class="pill select">
+          <label for="currencySelect">Currency</label>
+          <select id="currencySelect" aria-label="Currency"></select>
+        </div>
+        <button class="ghost-btn" id="themeToggleBtn" title="Toggle theme">Toggle Dark/Light</button>
+      </div>
+    </div>
+
+    <div class="cards" id="cards"></div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header>
+        <h2 id="modalTitle">Add Ingredient</h2>
+        <button class="ghost-btn" id="closeModalBtn">✕</button>
+      </header>
+
+      <div class="grid">
+        <div class="field col-12">
+          <label for="name">Ingredient name</label>
+          <input id="name" placeholder="e.g., All-purpose flour" />
+        </div>
+
+        <!-- Purchase qty first, then price -->
+        <div class="field col-3">
+          <label for="purchaseQty">Purchase qty</label>
+          <input id="purchaseQty" type="number" min="0" step="0.0001" placeholder="e.g., 1" />
+        </div>
+
+        <div class="field col-3">
+          <label for="purchaseUnit">Unit</label>
+          <select id="purchaseUnit"></select>
+        </div>
+
+        <div class="field col-6">
+          <label for="purchasePrice">Purchase price (total pack)</label>
+          <input id="purchasePrice" type="number" min="0" step="0.01" placeholder="e.g., 120.00" />
+          <div class="help">Total you paid for the pack.</div>
+        </div>
+
+        <div class="field col-3">
+          <label for="recipeQty">Recipe qty</label>
+          <input id="recipeQty" type="number" min="0" step="0.0001" placeholder="e.g., 250" />
+        </div>
+
+        <div class="field col-3">
+          <label for="recipeUnit">Unit</label>
+          <select id="recipeUnit"></select>
+        </div>
+
+        <div class="field col-6">
+          <label for="density">Density (optional, g per mL)</label>
+          <input id="density" type="number" min="0" step="0.0001" placeholder="Needed only to convert between mass and volume" />
+          <div class="help">If purchase is mass and recipe is volume (or vice versa), provide density to convert.</div>
+        </div>
+
+        <div class="col-12 subtle">
+          Supported units: mass (mg, g, kg, oz, lb), volume (ml, L, tsp, tbsp, cup, fl_oz), each (ea, dozen).
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="footer">
+        <button class="ghost-btn" id="clearFormBtn">Clear</button>
+        <button class="btn" id="saveIngredientBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Units
+  const MASS_TO_G = {"mg":0.001,"g":1,"kg":1000,"oz":28.349523125,"lb":453.59237};
+  const VOL_TO_ML = {"ml":1,"l":1000,"tsp":4.92892159375,"tbsp":14.78676478125,"cup":240,"fl_oz":29.5735295625};
+  const EACH_TO_EA = {"ea":1,"dozen":12};
+  const ALL_UNITS = [
+    {group:"Mass (g)", units:Object.keys(MASS_TO_G)},
+    {group:"Volume (mL)", units:Object.keys(VOL_TO_ML)},
+    {group:"Each (ea)", units:Object.keys(EACH_TO_EA)}
+  ];
+
+  // Currencies
+  const CURRENCIES = [
+    {code:"PHP", symbol:"₱", name:"Philippine Peso"},
+    {code:"USD", symbol:"$", name:"US Dollar"},
+    {code:"EUR", symbol:"€", name:"Euro"},
+    {code:"JPY", symbol:"¥", name:"Japanese Yen"},
+    {code:"GBP", symbol:"£", name:"British Pound"},
+    {code:"CNY", symbol:"¥", name:"Chinese Yuan"},
+    {code:"AUD", symbol:"$", name:"Australian Dollar"},
+    {code:"CAD", symbol:"$", name:"Canadian Dollar"},
+    {code:"SGD", symbol:"$", name:"Singapore Dollar"},
+    {code:"HKD", symbol:"$", name:"Hong Kong Dollar"},
+    {code:"KRW", symbol:"₩", name:"South Korean Won"},
+    {code:"INR", symbol:"₹", name:"Indian Rupee"},
+    {code:"THB", symbol:"฿", name:"Thai Baht"},
+    {code:"IDR", symbol:"Rp", name:"Indonesian Rupiah"},
+    {code:"MYR", symbol:"RM", name:"Malaysian Ringgit"},
+    {code:"TWD", symbol:"NT$", name:"New Taiwan Dollar"},
+    {code:"VND", symbol:"₫", name:"Vietnamese Đồng"},
+    {code:"NZD", symbol:"$", name:"New Zealand Dollar"},
+    {code:"CHF", symbol:"CHF", name:"Swiss Franc"},
+    {code:"SEK", symbol:"kr", name:"Swedish Krona"},
+    {code:"NOK", symbol:"kr", name:"Norwegian Krone"},
+    {code:"DKK", symbol:"kr", name:"Danish Krone"},
+    {code:"SAR", symbol:"﷼", name:"Saudi Riyal"},
+    {code:"AED", symbol:"د.إ", name:"UAE Dirham"}
+  ];
+
+  // Elements
+  const purchaseUnitSel = document.getElementById('purchaseUnit');
+  const recipeUnitSel = document.getElementById('recipeUnit');
+  const currencySelect = document.getElementById('currencySelect');
+  const totalEl = document.getElementById('totalCost');
+  const countEl = document.getElementById('ingredientCount');
+  const cardsEl = document.getElementById('cards');
+  const modal = document.getElementById('modalBackdrop');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+  const nameEl = document.getElementById('name');
+  const purchasePriceEl = document.getElementById('purchasePrice');
+  const purchaseQtyEl = document.getElementById('purchaseQty');
+  const purchaseUnitEl = document.getElementById('purchaseUnit');
+  const recipeQtyEl = document.getElementById('recipeQty');
+  const recipeUnitEl = document.getElementById('recipeUnit');
+  const densityEl = document.getElementById('density');
+
+  const addBtn = document.getElementById('addIngredientBtn');
+  const saveBtn = document.getElementById('saveIngredientBtn');
+  const closeBtn = document.getElementById('closeModalBtn');
+  const clearFormBtn = document.getElementById('clearFormBtn');
+  const resetAllBtn = document.getElementById('resetAllBtn');
+
+  function populateUnits(selectEl){
+    selectEl.innerHTML = "";
+    ALL_UNITS.forEach(g => {
+      const og = document.createElement('optgroup');
+      og.label = g.group;
+      g.units.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.textContent = u;
+        og.appendChild(opt);
+      });
+      selectEl.appendChild(og);
+    });
+  }
+  populateUnits(purchaseUnitSel); populateUnits(recipeUnitSel);
+
+  // Currencies
+  function populateCurrencies() {
+    currencySelect.innerHTML = "";
+    CURRENCIES.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.code;
+      opt.textContent = `${c.symbol} ${c.code} — ${c.name}`;
+      currencySelect.appendChild(opt);
+    });
+    currencySelect.value = "PHP";
+  }
+  populateCurrencies();
+  function getCurrencySymbol() {
+    const selected = CURRENCIES.find(c => c.code === currencySelect.value) || CURRENCIES[0];
+    return selected.symbol;
+  }
+
+  // Theme handling
+  function setTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('icc:theme', theme);
+    // force reflow of option colors in some browsers
+    const selList = document.querySelectorAll('select');
+    selList.forEach(s => { const v=s.value; s.value=''; s.value=v; });
+  }
+  function initTheme(){
+    const saved = localStorage.getItem('icc:theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(saved || (prefersDark ? 'dark':'light'));
+  }
+  initTheme();
+  themeToggleBtn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  let items = [];
+
+  function openModal(){ modal.style.display = 'flex'; requestAnimationFrame(() => modal.setAttribute('aria-hidden', 'false')); }
+  function closeModal(){ modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+  function clearForm(){
+    nameEl.value = ""; purchasePriceEl.value = ""; purchaseQtyEl.value = ""; recipeQtyEl.value = ""; densityEl.value = "";
+    purchaseUnitEl.value = "g"; recipeUnitEl.value = "g";
+  }
+
+  function formatMoney(v){
+    const sym = getCurrencySymbol();
+    try{ return sym + Number(v).toFixed(2); }catch{ return sym + v; }
+  }
+
+  function getUnitType(u){ if(u in MASS_TO_G) return "mass"; if(u in VOL_TO_ML) return "volume"; if(u in EACH_TO_EA) return "each"; return null; }
+  function toBase(qty, unit){
+    const t = getUnitType(unit);
+    if(t === "mass") return qty * MASS_TO_G[unit];
+    if(t === "volume") return qty * VOL_TO_ML[unit];
+    if(t === "each") return qty * EACH_TO_EA[unit];
+    throw new Error("Unknown unit: " + unit);
+  }
+
+  function computeCost(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density){
+    const purchaseType = getUnitType(purchaseUnit);
+    const recipeType = getUnitType(recipeUnit);
+    let purchaseBase = toBase(purchaseQty, purchaseUnit);
+    let recipeBase;
+    if(purchaseType === recipeType){
+      recipeBase = toBase(recipeQty, recipeUnit);
+    } else {
+      if(!density || density <= 0){
+        throw new Error("Unit types differ. Provide density (g/mL) to convert.");
+      }
+      if(purchaseType === "mass" && recipeType === "volume"){
+        const recipeMl = toBase(recipeQty, recipeUnit);
+        recipeBase = recipeMl * density; // grams
+      } else if(purchaseType === "volume" && recipeType === "mass"){
+        const recipeG = toBase(recipeQty, recipeUnit);
+        recipeBase = recipeG / density; // mL
+      } else {
+        throw new Error("Conversion between 'each' and mass/volume is not supported.");
+      }
+    }
+    if(purchaseBase <= 0) throw new Error("Purchase quantity must be greater than 0.");
+    const costPerBase = purchasePrice / purchaseBase;
+    return { costForRecipe: costPerBase * recipeBase, costPerBase };
+  }
+
+  function recalc(){
+    const total = items.reduce((sum, it) => sum + it.costForRecipe, 0);
+    totalEl.textContent = formatMoney(total);
+    countEl.textContent = items.length + (items.length === 1 ? " ingredient" : " ingredients");
+  }
+
+  function cardHTML(it, idx){
+    const sym = getCurrencySymbol();
+    const note = it.note ? `<span class="pill">${it.note}</span>` : "";
+    return `
+      <div class="card" data-index="${idx}">
+        <h3>${it.name}</h3>
+        <div class="line">
+          <span class="pill">Pack: ${it.purchaseQty} ${it.purchaseUnit} @ ${sym}${Number(it.purchasePrice).toFixed(2)}</span>
+          <span class="pill">Recipe: ${it.recipeQty} ${it.recipeUnit}</span>
+          ${it.density ? `<span class="pill">Density: ${it.density} g/mL</span>` : ""}
+          ${note}
+        </div>
+        <div class="line">
+          <span class="muted">Cost for recipe:</span>
+          <span class="money">${formatMoney(it.costForRecipe)}</span>
+        </div>
+        <div class="card-actions">
+          <button class="ghost-btn warn" data-action="duplicate">Duplicate</button>
+          <button class="ghost-btn danger" data-action="delete">Delete</button>
+        </div>
+      </div>`;
+  }
+  function render(){ cardsEl.innerHTML = items.map((it, idx) => cardHTML(it, idx)).join(""); }
+
+  // Events
+  addBtn.addEventListener('click', () => { clearForm(); openModal(); });
+  closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+  clearFormBtn.addEventListener('click', clearForm);
+  resetAllBtn.addEventListener('click', () => {
+    if(confirm("Clear all ingredients?")){ items = []; render(); recalc(); }
+  });
+  saveBtn.addEventListener('click', () => {
+    const name = (nameEl.value || "").trim() || "Ingredient";
+    const purchasePrice = Number(purchasePriceEl.value);
+    const purchaseQty = Number(purchaseQtyEl.value);
+    const purchaseUnit = purchaseUnitEl.value;
+    const recipeQty = Number(recipeQtyEl.value);
+    const recipeUnit = recipeUnitEl.value;
+    const density = densityEl.value ? Number(densityEl.value) : null;
+
+    if(!(purchasePrice >= 0) || !(purchaseQty > 0) || !(recipeQty > 0)){
+      alert("Enter valid numbers for price, purchase qty, and recipe qty."); return;
+    }
+    try{
+      const { costForRecipe } = computeCost(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density);
+      const note = (purchaseUnit !== recipeUnit && density) ? "cross-type via density" : "";
+      items.push({ name, purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density, costForRecipe, note });
+      render(); recalc(); closeModal();
+    }catch(err){ alert(err.message || String(err)); }
+  });
+  cardsEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.card'); if(!card) return;
+    const idx = Number(card.dataset.index); const action = e.target.dataset.action;
+    if(action === 'delete'){ items.splice(idx, 1); render(); recalc(); }
+    else if(action === 'duplicate'){ items.splice(idx+1, 0, {...items[idx]}); render(); recalc(); }
+  });
+  currencySelect.addEventListener('change', () => { recalc(); render(); });
+
+  // Defaults
+  purchaseUnitSel.value = "g"; recipeUnitSel.value = "g"; recalc();
+</script>
+</body>
+</html>
