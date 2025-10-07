@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ingredient Cost Calculator</title>
+<title>Costkit — Ingredient Cost Calculator</title>
 <style>
   /* THEME TOKENS */
   :root{
@@ -14,24 +14,25 @@
     --warn:#f59e0b;
     --danger:#ef4444;
     --gold: rgba(245, 158, 11, .70);
+    --gold-strong: rgba(245, 158, 11, .95);
   }
   /* DARK THEME */
   [data-theme="dark"]{
-    --bg1:#0f172a; /* slate-900 */
-    --bg2:#1e293b; /* slate-800 */
+    --bg1:#0f172a;
+    --bg2:#1e293b;
     --text:#e5e7eb;
     --muted:#94a3b8;
     --card: rgba(15,23,42,.8);
     --card2: rgba(2,6,23,.8);
     --ring:#f59e0b;
     --border: var(--gold);
-    --menu-bg:#0b1220;   /* dropdown list bg */
-    --menu-fg:#e5e7eb;   /* dropdown list text */
+    --menu-bg:#0b1220;
+    --menu-fg:#e5e7eb;
   }
   /* LIGHT THEME */
   [data-theme="light"]{
-    --bg1:#f8fafc; /* slate-50 */
-    --bg2:#eef2ff; /* indigo-50 */
+    --bg1:#f8fafc;
+    --bg2:#eef2ff;
     --text:#0f172a;
     --muted:#475569;
     --card:#ffffff;
@@ -55,19 +56,45 @@
     transition: background-color .2s ease, color .2s ease;
   }
 
-  .container{ max-width:1100px; margin:40px auto; padding:0 20px 80px; }
-  .topbar{ display:flex; align-items:center; gap:16px; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; }
-  .totals{
+  /* Brand bar */
+  .brandbar{
+    max-width:1200px; margin:24px auto 8px; padding:0 20px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{
+    display:flex; align-items:center; gap:12px;
+    padding:8px 10px; border:1px solid var(--border); border-radius:999px;
+    background: color-mix(in oklab, var(--card2) 85%, transparent);
+    box-shadow: var(--shadow);
+  }
+  .brand svg{ display:block; }
+  .brand-name{ font-weight:900; font-size:20px; letter-spacing:.3px; }
+  .brand-tag{ font-size:12px; color:var(--muted); margin-left:6px; }
+
+  .toolbar{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+
+  .container{ max-width:1200px; margin:8px auto 40px; padding:0 20px 80px; }
+  .layout{ display:grid; grid-template-columns: 1fr 320px; gap:16px; align-items:start; }
+  @media (max-width: 1024px){ .layout{ grid-template-columns: 1fr; } }
+
+  /* Panels */
+  .panels{ display:grid; gap:16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 920px){ .panels{ grid-template-columns: 1fr; } }
+  .panel{
     padding:18px 22px; border-radius: var(--radius);
     background: linear-gradient(135deg, rgba(99,102,241,.15), rgba(56,189,248,.12));
     border:1px solid var(--border);
     box-shadow: var(--shadow);
-    display:flex; align-items:center; gap:16px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    min-height: 90px;
   }
-  .totals .label{ color: var(--muted); font-weight:600; letter-spacing:.02em;}
-  .totals .value{ font-size: clamp(24px, 3.5vw, 36px); font-weight: 800; }
-  .controls{ display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+  .panel .label{ color: var(--muted); font-weight:600; letter-spacing:.02em;}
+  .panel .value{ font-size: clamp(24px, 3.5vw, 36px); font-weight: 800; }
+  .panel-right{ display:flex; align-items:center; gap:12px; flex-wrap: wrap; }
 
+  /* Controls */
   .btn{
     appearance:none; border:none; outline:none;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -84,7 +111,7 @@
   }
 
   .pill{
-    font-size:12px; padding:4px 8px; border-radius:999px;
+    font-size:12px; padding:6px 10px; border-radius:999px;
     border:1px solid var(--border);
     background: color-mix(in oklab, var(--card2) 85%, transparent);
     color:var(--text);
@@ -95,12 +122,9 @@
     appearance:none; outline:none; border:none; background: transparent;
     color:var(--text); font-size:14px; padding:8px 6px; border-radius:10px;
   }
-  /* Dropdown list (options) readable in both themes */
-  select option{
-    background: var(--menu-bg);
-    color: var(--menu-fg);
-  }
+  select option{ background: var(--menu-bg); color: var(--menu-fg); }
 
+  /* Cards */
   .cards{ display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-top:20px; }
   .card{
     background: linear-gradient(180deg, var(--card), var(--card2));
@@ -116,15 +140,38 @@
   .line{ display:flex; gap:10px; align-items:center; margin:8px 0; color:var(--muted); font-size:14px; flex-wrap: wrap; }
   .money{ color:var(--text); font-weight:800; }
   .muted{ color:var(--muted); }
-  .card-actions{ display:flex; gap:8px; margin-top:12px; }
+  .card-actions{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
   .danger{ background: linear-gradient(135deg, #fb7185, #f43f5e); color:#0b1020; }
   .warn{ background: linear-gradient(135deg, #fbbf24, #f59e0b); color:#0b1020; }
+  .edit{ background: linear-gradient(135deg, #34d399, #10b981); color:#0b1020; }
+
+  /* Sidebar */
+  .sidebar{
+    position: sticky; top:18px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .sidebar .title{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px; border:1px solid var(--border); border-radius:14px;
+    background: color-mix(in oklab, var(--card2) 85%, transparent);
+    box-shadow: var(--shadow);
+    font-weight:700;
+  }
+  .mini-card{
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--border); border-radius:14px; padding:12px;
+    box-shadow: var(--shadow);
+  }
+  .mini-card h4{ margin:0 0 6px 0; font-size:14px; font-weight:800; }
+  .mini-row{ display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--muted); }
+  .mini-need{ font-weight:800; color:var(--text); }
+  .empty{ font-size:12px; color:var(--muted); padding:8px 6px; border:1px dashed var(--border); border-radius:12px; text-align:center; }
 
   /* Modal */
   .modal-backdrop{ position:fixed; inset:0; background: rgba(2,6,23,.6); backdrop-filter: blur(6px);
     display:none; align-items:center; justify-content:center; padding:20px; z-index: 50; }
   [data-theme="light"] .modal-backdrop{ background: rgba(0,0,0,.25); }
-  .modal{ width:min(720px, 96vw); background: linear-gradient(180deg, var(--card), var(--card2));
+  .modal{ width:min(760px, 96vw); background: linear-gradient(180deg, var(--card), var(--card2));
     border:1px solid var(--border); border-radius:22px; padding:20px; box-shadow: var(--shadow); }
   .modal header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
   .modal h2{ margin:0; font-size:22px; }
@@ -144,35 +191,81 @@
   .subtle{ font-size:12px; color:var(--muted); }
   .divider{ height:1px; background: var(--border); margin:8px 0 12px; }
   .footer{ display:flex; justify-content:flex-end; gap:10px; margin-top:10px; }
-
-  @media (max-width: 640px){
-    .topbar{ flex-direction:column; align-items:stretch; gap:10px; }
-    .controls{ justify-content:space-between; }
-  }
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="totals">
-        <div>
-          <div class="label">Total Recipe Cost</div>
-          <div class="value" id="totalCost">₱0.00</div>
-        </div>
-        <span class="pill" id="ingredientCount">0 ingredients</span>
-      </div>
-      <div class="controls">
-        <button class="btn" id="addIngredientBtn">+ Add Ingredient</button>
-        <button class="ghost-btn" id="resetAllBtn" title="Clear all">Reset</button>
-        <div class="pill select">
-          <label for="currencySelect">Currency</label>
-          <select id="currencySelect" aria-label="Currency"></select>
-        </div>
-        <button class="ghost-btn" id="themeToggleBtn" title="Toggle theme">Toggle Dark/Light</button>
-      </div>
+  <!-- Brand -->
+  <div class="brandbar">
+    <div class="brand">
+      <!-- Simple SVG logo -->
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+        <defs>
+          <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stop-color="#fbbf24"/>
+            <stop offset="1" stop-color="#38bdf8"/>
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#g)" stroke="var(--gold-strong)" stroke-width="1"/>
+        <text x="16" y="20" text-anchor="middle" font-family="Inter,Arial" font-size="12" font-weight="900" fill="#0b1020">CK</text>
+      </svg>
+      <span class="brand-name">Costkit</span>
+      <span class="brand-tag">Ingredient Cost Calculator</span>
     </div>
+    <div class="toolbar">
+      <button class="ghost-btn" id="themeToggleBtn" title="Toggle theme">Toggle Dark/Light</button>
+    </div>
+  </div>
 
-    <div class="cards" id="cards"></div>
+  <div class="container">
+    <div class="layout">
+      <!-- MAIN COLUMN -->
+      <main>
+        <div class="panels">
+          <div class="panel">
+            <div>
+              <div class="label">Total Recipe Cost</div>
+              <div class="value" id="totalCost">₱0.00</div>
+              <div class="pill" id="ingredientCount">0 ingredients</div>
+            </div>
+            <div class="panel-right">
+              <button class="btn" id="addIngredientBtn">+ Add Ingredient</button>
+              <button class="ghost-btn" id="resetAllBtn" title="Clear all">Reset</button>
+              <div class="pill select">
+                <label for="currencySelect">Currency</label>
+                <select id="currencySelect" aria-label="Currency"></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div>
+              <div class="label">Maximum dishes from current stock</div>
+              <div class="value" id="maxDishes">0</div>
+            </div>
+            <div class="panel-right">
+              <div class="pill">
+                <label for="targetDishes" style="margin-right:8px;">Target dishes</label>
+                <input id="targetDishes" type="number" min="0" step="1" value="10" style="width:90px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ingredient Cards -->
+        <div class="cards" id="cards"></div>
+      </main>
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="title">
+          <span>Shortages</span>
+          <span id="shortageTitleNote" class="muted" style="font-size:12px;"></span>
+        </div>
+        <div id="shortageCol">
+          <div class="empty">No shortages.</div>
+        </div>
+      </aside>
+    </div>
   </div>
 
   <!-- Modal -->
@@ -284,6 +377,10 @@
   const cardsEl = document.getElementById('cards');
   const modal = document.getElementById('modalBackdrop');
   const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const maxDishesEl = document.getElementById('maxDishes');
+  const targetInput = document.getElementById('targetDishes');
+  const shortageCol = document.getElementById('shortageCol');
+  const shortageTitleNote = document.getElementById('shortageTitleNote');
 
   const nameEl = document.getElementById('name');
   const purchasePriceEl = document.getElementById('purchasePrice');
@@ -336,7 +433,6 @@
   function setTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('icc:theme', theme);
-    // force reflow of option colors in some browsers
     const selList = document.querySelectorAll('select');
     selList.forEach(s => { const v=s.value; s.value=''; s.value=v; });
   }
@@ -351,10 +447,20 @@
     setTheme(current === 'dark' ? 'light' : 'dark');
   });
 
-  let items = [];
+  // Data
+  let items = []; // each item will also store calc: purchaseBase, recipeBase
+  let editingIndex = null;
 
-  function openModal(){ modal.style.display = 'flex'; requestAnimationFrame(() => modal.setAttribute('aria-hidden', 'false')); }
-  function closeModal(){ modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+  function openModal(title="Add Ingredient"){
+    document.getElementById('modalTitle').textContent = title;
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => modal.setAttribute('aria-hidden', 'false'));
+  }
+  function closeModal(){
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    editingIndex = null;
+  }
   function clearForm(){
     nameEl.value = ""; purchasePriceEl.value = ""; purchaseQtyEl.value = ""; recipeQtyEl.value = ""; densityEl.value = "";
     purchaseUnitEl.value = "g"; recipeUnitEl.value = "g";
@@ -374,10 +480,11 @@
     throw new Error("Unknown unit: " + unit);
   }
 
-  function computeCost(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density){
+  function computeMetrics(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density){
     const purchaseType = getUnitType(purchaseUnit);
     const recipeType = getUnitType(recipeUnit);
-    let purchaseBase = toBase(purchaseQty, purchaseUnit);
+    const purchaseBase = toBase(purchaseQty, purchaseUnit); // g/ml/ea
+
     let recipeBase;
     if(purchaseType === recipeType){
       recipeBase = toBase(recipeQty, recipeUnit);
@@ -396,14 +503,20 @@
       }
     }
     if(purchaseBase <= 0) throw new Error("Purchase quantity must be greater than 0.");
+    if(!(recipeBase > 0)) throw new Error("Recipe quantity must be greater than 0.");
     const costPerBase = purchasePrice / purchaseBase;
-    return { costForRecipe: costPerBase * recipeBase, costPerBase };
+    const costForRecipe = costPerBase * recipeBase;
+    return { purchaseType, recipeType, purchaseBase, recipeBase, costPerBase, costForRecipe };
   }
 
   function recalc(){
     const total = items.reduce((sum, it) => sum + it.costForRecipe, 0);
     totalEl.textContent = formatMoney(total);
     countEl.textContent = items.length + (items.length === 1 ? " ingredient" : " ingredients");
+    const capacities = items.map(it => Math.floor(it.purchaseBase / it.recipeBase));
+    const maxDishes = capacities.length ? Math.min(...capacities) : 0;
+    maxDishesEl.textContent = String(maxDishes);
+    computeShortages();
   }
 
   function cardHTML(it, idx){
@@ -423,6 +536,7 @@
           <span class="money">${formatMoney(it.costForRecipe)}</span>
         </div>
         <div class="card-actions">
+          <button class="ghost-btn edit" data-action="edit">Edit</button>
           <button class="ghost-btn warn" data-action="duplicate">Duplicate</button>
           <button class="ghost-btn danger" data-action="delete">Delete</button>
         </div>
@@ -430,15 +544,68 @@
   }
   function render(){ cardsEl.innerHTML = items.map((it, idx) => cardHTML(it, idx)).join(""); }
 
+  function renderShortages(rows, target){
+    shortageTitleNote.textContent = target ? (`for ${target} dish${target>1?'es':''}`) : '';
+    if(!rows.length){
+      shortageCol.innerHTML = `<div class="empty">No shortages.</div>`;
+      return;
+    }
+    const html = rows.map(r => `
+      <div class="mini-card">
+        <h4>${r.name}</h4>
+        <div class="mini-row"><span>Available</span><span>${r.available.toFixed(2)} ${r.unit}</span></div>
+        <div class="mini-row"><span>Required</span><span>${r.required.toFixed(2)} ${r.unit}</span></div>
+        <div class="mini-row"><span>Missing</span><span class="mini-need">${r.missing.toFixed(2)} ${r.unit}</span></div>
+      </div>
+    `).join('');
+    shortageCol.innerHTML = html;
+  }
+
+  function computeShortages(){
+    const target = Math.max(0, Math.floor(Number(targetInput.value || 0)));
+    if(!target || items.length === 0){
+      renderShortages([], target);
+      return;
+    }
+    const rows = [];
+    items.forEach(it => {
+      const needBase = target * it.recipeBase;
+      const shortageBase = Math.max(0, needBase - it.purchaseBase);
+      const type = it.purchaseType;
+      let unit = it.purchaseUnit;
+      let available, required, missing;
+      if(type === "mass"){
+        available = it.purchaseBase / MASS_TO_G[unit];
+        required = needBase / MASS_TO_G[unit];
+        missing = shortageBase / MASS_TO_G[unit];
+      } else if(type === "volume"){
+        available = it.purchaseBase / VOL_TO_ML[unit];
+        required = needBase / VOL_TO_ML[unit];
+        missing = shortageBase / VOL_TO_ML[unit];
+      } else {
+        available = it.purchaseBase / EACH_TO_EA[unit];
+        required = needBase / EACH_TO_EA[unit];
+        missing = shortageBase / EACH_TO_EA[unit];
+      }
+      if(missing > 0){
+        rows.push({name: it.name, available, required, missing, unit});
+      }
+    });
+    renderShortages(rows, target);
+  }
+
   // Events
-  addBtn.addEventListener('click', () => { clearForm(); openModal(); });
+  addBtn.addEventListener('click', () => { clearForm(); editingIndex = null; openModal("Add Ingredient"); });
   closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
   clearFormBtn.addEventListener('click', clearForm);
   resetAllBtn.addEventListener('click', () => {
     if(confirm("Clear all ingredients?")){ items = []; render(); recalc(); }
   });
-  saveBtn.addEventListener('click', () => {
+  targetInput.addEventListener('input', computeShortages);
+  currencySelect.addEventListener('change', () => { recalc(); render(); });
+
+  const saveBtnHandler = () => {
     const name = (nameEl.value || "").trim() || "Ingredient";
     const purchasePrice = Number(purchasePriceEl.value);
     const purchaseQty = Number(purchaseQtyEl.value);
@@ -451,19 +618,39 @@
       alert("Enter valid numbers for price, purchase qty, and recipe qty."); return;
     }
     try{
-      const { costForRecipe } = computeCost(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density);
-      const note = (purchaseUnit !== recipeUnit && density) ? "cross-type via density" : "";
-      items.push({ name, purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density, costForRecipe, note });
+      const m = computeMetrics(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density);
+      const note = (m.purchaseType !== m.recipeType && density) ? "cross-type via density" : "";
+      const record = { name, purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density, note, ...m };
+      if(editingIndex !== null){
+        items[editingIndex] = record;
+      } else {
+        items.push(record);
+      }
       render(); recalc(); closeModal();
     }catch(err){ alert(err.message || String(err)); }
-  });
+  };
+  saveBtn.addEventListener('click', saveBtnHandler);
+
   cardsEl.addEventListener('click', (e) => {
     const card = e.target.closest('.card'); if(!card) return;
     const idx = Number(card.dataset.index); const action = e.target.dataset.action;
-    if(action === 'delete'){ items.splice(idx, 1); render(); recalc(); }
-    else if(action === 'duplicate'){ items.splice(idx+1, 0, {...items[idx]}); render(); recalc(); }
+    if(action === 'delete'){
+      items.splice(idx, 1); render(); recalc();
+    } else if(action === 'duplicate'){
+      items.splice(idx+1, 0, {...items[idx]}); render(); recalc();
+    } else if(action === 'edit'){
+      const it = items[idx];
+      nameEl.value = it.name;
+      purchasePriceEl.value = it.purchasePrice;
+      purchaseQtyEl.value = it.purchaseQty;
+      purchaseUnitEl.value = it.purchaseUnit;
+      recipeQtyEl.value = it.recipeQty;
+      recipeUnitEl.value = it.recipeUnit;
+      densityEl.value = it.density ?? "";
+      editingIndex = idx;
+      openModal("Edit Ingredient");
+    }
   });
-  currencySelect.addEventListener('change', () => { recalc(); render(); });
 
   // Defaults
   purchaseUnitSel.value = "g"; recipeUnitSel.value = "g"; recalc();
