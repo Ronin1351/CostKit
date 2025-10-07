@@ -225,6 +225,10 @@
     </div>
     <div class="toolbar">
       <button class="ghost-btn" id="themeToggleBtn" title="Toggle theme">Toggle Dark/Light</button>
+      <button class="ghost-btn" id="saveRecipeBtn" title="Save recipe">Save</button>
+      <button class="ghost-btn" id="saveAsRecipeBtn" title="Save as new recipe">Save as</button>
+      <button class="ghost-btn" id="loadRecipeBtn" title="Load recipe">Load</button>
+      <input type="file" id="fileLoader" accept=".json,application/json" style="display:none" />
     </div>
   </div>
 
@@ -666,6 +670,198 @@
 
   // Defaults
   purchaseUnitSel.value = "g"; recipeUnitSel.value = "g"; recalc();
+  // --- Save/Load helpers ---
+  // ===== File System Access (directory choose + overwrite warn) =====
+  // Minimal IndexedDB keyval for persisting directory handle
+  const DB_NAME = "costkit-db";
+  const STORE = "handles";
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGet(key){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const st = tx.objectStore(STORE);
+      const req = st.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, val){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const st = tx.objectStore(STORE);
+      const req = st.put(val, key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  let dirHandle = null;
+  async function getSavedDirHandle(){
+    try { return await idbGet("dir"); } catch { return null; }
+  }
+  async function saveDirHandle(handle){
+    try { await idbSet("dir", handle); } catch {}
+  }
+
+  async function ensureDirectory(){
+    if(!("showDirectoryPicker" in window)) return null;
+    if(!dirHandle){
+      dirHandle = await getSavedDirHandle();
+    }
+    // Verify permission; if missing, ask again
+    async function verifyPerm(handle){
+      const opts = { mode: "readwrite" };
+      if(await handle.queryPermission(opts) === "granted") return true;
+      return (await handle.requestPermission(opts)) === "granted";
+    }
+    if(dirHandle && !(await verifyPerm(dirHandle))) dirHandle = null;
+    if(!dirHandle){
+      dirHandle = await window.showDirectoryPicker();
+      await saveDirHandle(dirHandle);
+    }
+    return dirHandle;
+  }
+
+  async function fileExistsInDir(handle, name){
+    try { await handle.getFileHandle(name, { create: false }); return true; }
+    catch { return false; }
+  }
+
+  async function saveViaFS(payload, suggestedName){
+    // Prefer user-chosen directory if available
+    if("showDirectoryPicker" in window){
+      const dir = await ensureDirectory();
+      if(!dir) throw new Error("Directory not selected.");
+      let fileName = suggestedName.endsWith(".json") ? suggestedName : suggestedName + ".json";
+      if(await fileExistsInDir(dir, fileName)){
+        const ok = confirm(`"${fileName}" already exists. Overwrite?`);
+        if(!ok) return false;
+      }
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const writable = await fh.createWritable();
+      await writable.write(JSON.stringify(payload, null, 2));
+      await writable.close();
+      return true;
+    }
+    // Fallback: showSaveFilePicker
+    if("showSaveFilePicker" in window){
+      const handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName.endsWith(".json") ? suggestedName : suggestedName + ".json",
+        types:[{description:"JSON", accept:{ "application/json": [".json"]}}]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(payload, null, 2));
+      await writable.close();
+      return true;
+    }
+    // Final fallback: classic download
+    downloadJSON(suggestedName.endsWith(".json") ? suggestedName : suggestedName + ".json", payload);
+    return true;
+  }
+
+  function serializeState(){
+    return {
+      version: 1,
+      currency: currencySelect.value,
+      target: Number(targetInput.value || 0),
+      items: items.map(({name,purchasePrice,purchaseQty,purchaseUnit,recipeQty,recipeUnit,density}) => ({
+        name,purchasePrice,purchaseQty,purchaseUnit,recipeQty,recipeUnit,density
+      }))
+    };
+  }
+  function deserializeState(data){
+    if(!data || !Array.isArray(data.items)) throw new Error("Invalid recipe file.");
+    // reconstruct computed fields
+    const restored = [];
+    data.items.forEach((it) => {
+      const name = it.name || "Ingredient";
+      const purchasePrice = Number(it.purchasePrice);
+      const purchaseQty = Number(it.purchaseQty);
+      const purchaseUnit = it.purchaseUnit;
+      const recipeQty = Number(it.recipeQty);
+      const recipeUnit = it.recipeUnit;
+      const density = (it.density === null || it.density === undefined || it.density === "") ? null : Number(it.density);
+      const m = computeMetrics(purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density);
+      const note = (m.purchaseType !== m.recipeType && density) ? "cross-type via density" : "";
+      restored.push({ name, purchasePrice, purchaseQty, purchaseUnit, recipeQty, recipeUnit, density, note, ...m });
+    });
+    items = restored;
+    if(data.currency){ currencySelect.value = data.currency; }
+    if(typeof data.target === "number"){ targetInput.value = String(Math.max(0, Math.floor(data.target))); }
+    render(); recalc();
+  }
+  function downloadJSON(filename, data){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+  function promptRecipeName(defaultName="My Recipe"){
+    const n = prompt("Recipe name:", defaultName);
+    if(!n) return null;
+    return n.trim();
+  }
+  function resetApp(){
+    items = []; render(); recalc();
+  }
+
+  // Buttons
+  const saveRecipeBtn = document.getElementById('saveRecipeBtn');
+  const saveAsRecipeBtn = document.getElementById('saveAsRecipeBtn');
+  const loadRecipeBtn = document.getElementById('loadRecipeBtn');
+  const fileLoader = document.getElementById('fileLoader');
+  let currentRecipeName = null;
+
+  async function doSave(forcePrompt=false){
+    if(items.length === 0){ alert("Nothing to save. Please add at least one ingredient."); return; }
+    if(forcePrompt || !currentRecipeName){
+      const suggested = currentRecipeName || "Recipe-" + new Date().toISOString().slice(0,10);
+      const name = promptRecipeName(suggested);
+      if(!name) return;
+      currentRecipeName = name;
+    }
+    const payload = serializeState();
+    try{
+      // localStorage copy
+      localStorage.setItem("costkit:recipe:"+currentRecipeName, JSON.stringify(payload));
+    }catch{ /* ignore quota errors */ }
+    // File System Access (directory or Save dialog)
+    const ok = await saveViaFS(payload, currentRecipeName + ".json");
+    if(ok){ resetApp(); }
+  }
+
+  saveRecipeBtn.addEventListener('click', () => doSave(false));
+  saveAsRecipeBtn.addEventListener('click', () => doSave(true));
+  loadRecipeBtn.addEventListener('click', () => fileLoader.click());
+  fileLoader.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        deserializeState(data);
+        currentRecipeName = (f.name || "").replace(/\.json$/i, "") || null;
+      }catch(err){
+        alert("Failed to load recipe: " + (err.message || err));
+      }finally{
+        fileLoader.value = "";
+      }
+    };
+    reader.readAsText(f);
+  });
+
 </script>
 
   <footer class="credit">© 2025 Kevin Shokrollahi</footer>
